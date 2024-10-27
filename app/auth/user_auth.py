@@ -1,7 +1,6 @@
 # app/auth/user_auth.py
 import sqlite3
 from app.auth.mfa import verify_mfa_code, generate_mfa_secret, save_mfa_secret
-from app.storage.db_init import get_user_by_username
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
@@ -51,20 +50,28 @@ def register_user(username: str, master_password: str):
 
 # Аутентификация пользователя с проверкой мастер-пароля и MFA
 def authenticate_user(username: str, master_password: str, mfa_code: str) -> bool:
-    user = get_user_by_username(username)
+    conn = sqlite3.connect('password_manager.db')
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT id, salt, master_key FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+    conn.close()
 
     if not user:
+        print(f"Пользователь {username} не найден")
         return False
 
+    user_id, salt, stored_master_key = user
+
     # Генерация мастер-ключа на основе введенного пароля и соли
-    input_master_key = generate_master_key(master_password, user['salt'])
+    input_master_key = generate_master_key(master_password, salt)
 
     # Проверка совпадения ключей
-    if input_master_key == user['master_key']:
+    if input_master_key == stored_master_key:
         print(f"Пользователь {username} успешно аутентифицирован на этапе мастер-пароля")
 
         # Проверка MFA-кода
-        if verify_mfa_code(user['id'], mfa_code):
+        if verify_mfa_code(user_id, mfa_code):
             print("MFA успешно пройдена")
             return True
         else:
