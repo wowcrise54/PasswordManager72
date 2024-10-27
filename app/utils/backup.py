@@ -32,3 +32,12 @@ def restore_from_backup(backup_filepath: str):
         print(f"База данных успешно восстановлена из резервной копии: {backup_filepath}")
     except Exception as e:
         print(f"Ошибка при восстановлении базы данных: {e}")
+
+# Функция для удаления старых резервных копий
+def delete_old_backups(backup_dir: str = "backups", max_backups: int = 5):
+    if os.path.exists(backup_dir):
+        backups = sorted(os.listdir(backup_dir))
+        while len(backups) > max_backups:
+            oldest_backup = backups.pop(0)
+            os.remove(os.path.join(backup_dir, oldest_backup))
+            print(f"Удалена старая резервная копия: {oldest_backup}")

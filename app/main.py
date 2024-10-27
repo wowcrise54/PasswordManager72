@@ -2,7 +2,7 @@
 from app.storage.db_init import initialize_database
 from app.auth.user_auth import register_user, authenticate_user
 from app.storage.password_store import add_password, get_password
-from app.utils.backup import create_backup, restore_from_backup
+from app.utils.backup import create_backup, restore_from_backup, delete_old_backups
 from app.utils.cloud_backup import upload_backup_to_drive, download_backup_from_drive
 import os
 from datetime import datetime
@@ -32,6 +32,13 @@ def should_create_backup(backup_dir="backups", interval_days=1):
         return True
     return False
 
+# Настройки резервного копирования
+backup_settings = {
+    "interval_days": 1,         # Частота резервного копирования (ежедневно)
+    "max_backups": 5,           # Максимальное количество резервных копий
+    "cloud_enabled": True,      # Использовать облачное хранилище
+}
+
 # Регистрация пользователя
 username = "user1"
 master_password = "strong_password"
@@ -48,9 +55,12 @@ if authenticate_user(username, master_password, mfa_code):
     print(f"Расшифрованный пароль для example.com: {retrieved_password}")
 
     # Автоматическое создание резервной копии
-    if should_create_backup():
+    if should_create_backup(interval_days=backup_settings["interval_days"]):
         backup_filepath = create_backup()
-        if backup_filepath:
+        delete_old_backups(max_backups=backup_settings["max_backups"])
+        
+        # Если облачное резервное копирование включено
+        if backup_settings["cloud_enabled"] and backup_filepath:
             upload_backup_to_drive(backup_filepath)
 
 else:
