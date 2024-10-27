@@ -1,10 +1,12 @@
 # app/auth/user_auth.py
-import os
-import base64
 import sqlite3
+from app.auth.mfa import verify_mfa_code, generate_mfa_secret, save_mfa_secret
+from app.storage.db_init import get_user_by_username
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+import base64
+import os
 
 # Генерация мастер-ключа на основе пароля пользователя и соли
 def generate_master_key(master_password: str, salt: bytes) -> bytes:
@@ -37,35 +39,18 @@ def register_user(username: str, master_password: str):
     ''', (username, salt, master_key))
 
     conn.commit()
+
+    # Генерация и сохранение MFA-секрета
+    user_id = cursor.lastrowid  # Получаем ID только что созданного пользователя
+    mfa_secret = generate_mfa_secret()
+    save_mfa_secret(user_id, mfa_secret)
+
     conn.close()
 
-    print(f"Пользователь {username} успешно зарегистрирован")
+    print(f"Пользователь {username} успешно зарегистрирован. Настройте MFA с этим секретом: {mfa_secret}")
 
-# Получение информации о пользователе по имени
-def get_user_by_username(username: str):
-    conn = sqlite3.connect('password_manager.db')
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT id, username, salt, master_key FROM users WHERE username = ?
-    ''', (username,))
-    
-    user = cursor.fetchone()
-    conn.close()
-
-    if user:
-        return {
-            'id': user[0],
-            'username': user[1],
-            'salt': user[2],
-            'master_key': user[3]
-        }
-    else:
-        print(f"Пользователь {username} не найден")
-        return None
-
-# Аутентификация пользователя с проверкой мастер-пароля
-def authenticate_user(username: str, master_password: str) -> bool:
+# Аутентификация пользователя с проверкой мастер-пароля и MFA
+def authenticate_user(username: str, master_password: str, mfa_code: str) -> bool:
     user = get_user_by_username(username)
 
     if not user:
@@ -76,8 +61,15 @@ def authenticate_user(username: str, master_password: str) -> bool:
 
     # Проверка совпадения ключей
     if input_master_key == user['master_key']:
-        print(f"Пользователь {username} успешно аутентифицирован")
-        return True
+        print(f"Пользователь {username} успешно аутентифицирован на этапе мастер-пароля")
+
+        # Проверка MFA-кода
+        if verify_mfa_code(user['id'], mfa_code):
+            print("MFA успешно пройдена")
+            return True
+        else:
+            print("Неверный MFA-код")
+            return False
     else:
         print("Неверный мастер-пароль")
         return False

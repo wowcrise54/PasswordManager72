@@ -12,7 +12,8 @@ master_password = "strong_password"
 register_user(username, master_password)
 
 # Аутентификация пользователя
-if authenticate_user(username, master_password):
+mfa_code = input("Введите MFA-код: ")
+if authenticate_user(username, master_password, mfa_code):
     # Если аутентификация прошла успешно, добавляем пароль для сайта
     add_password(1, "example.com", "user_password_for_site", master_password)
 

@@ -27,5 +27,14 @@ def initialize_database():
         )
     ''')
 
+    # Создание таблицы для хранения секретных ключей MFA
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mfa (
+            user_id INTEGER PRIMARY KEY,
+            secret_key TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
